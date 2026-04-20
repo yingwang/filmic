@@ -8,6 +8,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
 import android.util.Size
 import android.widget.Toast
@@ -68,15 +70,16 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.yingwang.filmic.R
 import com.yingwang.filmic.lut.LutProcessor
 import com.yingwang.filmic.lut.Style
 import com.yingwang.filmic.lut.Styles
 import com.yingwang.filmic.settings.ExportSettings
 import com.yingwang.filmic.settings.rememberExportSettings
-import com.yingwang.filmic.settings.scaleForExport
 import java.util.concurrent.Executors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -213,7 +216,11 @@ fun CameraScreen(onBack: () -> Unit) {
                 contentAlignment = Alignment.Center,
             ) {
                 if (!hasPermission) {
-                    Text("需要相机权限", color = Color.White, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        text = stringResource(R.string.camera_permission_required),
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
                 } else {
                     AndroidView(
                         factory = { previewView },
@@ -253,6 +260,7 @@ fun CameraScreen(onBack: () -> Unit) {
                     .padding(bottom = 24.dp),
                 horizontalArrangement = Arrangement.Center,
             ) {
+                val mainHandler = remember { Handler(Looper.getMainLooper()) }
                 ShutterButton(enabled = hasPermission && !capturing) {
                     capturing = true
                     captureToGallery(
@@ -261,12 +269,16 @@ fun CameraScreen(onBack: () -> Unit) {
                         style = selectedStyle,
                         settings = settings.value,
                         onComplete = { ok ->
-                            capturing = false
-                            Toast.makeText(
-                                context,
-                                if (ok) "已保存到相册" else "拍摄失败",
-                                Toast.LENGTH_SHORT,
-                            ).show()
+                            mainHandler.post {
+                                capturing = false
+                                Toast.makeText(
+                                    context,
+                                    context.getString(
+                                        if (ok) R.string.toast_saved else R.string.toast_capture_failed,
+                                    ),
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                            }
                         },
                     )
                 }
@@ -334,12 +346,10 @@ private fun captureToGallery(
                         } ?: run { onComplete(false); return@Thread }
                         val styled = LutProcessor.apply(raw, style, context)
                         raw.recycle()
-                        val sized = styled.scaleForExport(settings.maxLongEdge)
-                        if (sized !== styled) styled.recycle()
                         context.contentResolver.openOutputStream(saved, "wt")?.use { out ->
-                            sized.compress(Bitmap.CompressFormat.JPEG, settings.jpegQuality, out)
+                            styled.compress(Bitmap.CompressFormat.JPEG, settings.jpegQuality, out)
                         }
-                        sized.recycle()
+                        styled.recycle()
                         onComplete(true)
                     } catch (t: Throwable) {
                         onComplete(false)

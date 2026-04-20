@@ -62,15 +62,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.exifinterface.media.ExifInterface
 import coil.compose.AsyncImage
+import com.yingwang.filmic.R
 import com.yingwang.filmic.lut.LutProcessor
 import com.yingwang.filmic.lut.Style
 import com.yingwang.filmic.lut.Styles
 import com.yingwang.filmic.settings.ExportSettings
 import com.yingwang.filmic.settings.rememberExportSettings
-import com.yingwang.filmic.settings.scaleForExport
 import java.io.OutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -114,7 +115,12 @@ fun BatchScreen(onBack: () -> Unit) {
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text("BATCH (${items.size})", style = MaterialTheme.typography.titleMedium) },
+                title = {
+                    Text(
+                        text = stringResource(R.string.batch_title, items.size).uppercase(),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -140,7 +146,10 @@ fun BatchScreen(onBack: () -> Unit) {
         ) {
             if (items.isEmpty()) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Text("还没选照片。", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        text = stringResource(R.string.batch_no_selection),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             } else {
                 LazyVerticalGrid(
@@ -163,7 +172,7 @@ fun BatchScreen(onBack: () -> Unit) {
 
             Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)) {
                 Text(
-                    text = "STYLE",
+                    text = stringResource(R.string.batch_style_heading).uppercase(),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -191,7 +200,7 @@ fun BatchScreen(onBack: () -> Unit) {
                     )
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        text = "处理中 $done / ${items.size}",
+                        text = stringResource(R.string.batch_processing, done, items.size),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -218,7 +227,9 @@ fun BatchScreen(onBack: () -> Unit) {
                         contentColor = MaterialTheme.colorScheme.onSurface,
                     ),
                     modifier = Modifier.weight(1f).height(52.dp),
-                ) { Text("重选", style = MaterialTheme.typography.labelLarge) }
+                ) {
+                    Text(stringResource(R.string.batch_reselect), style = MaterialTheme.typography.labelLarge)
+                }
 
                 Button(
                     enabled = items.isNotEmpty() && !running,
@@ -236,7 +247,7 @@ fun BatchScreen(onBack: () -> Unit) {
                             val good = results.count { it is BatchItemState.Done }
                             Toast.makeText(
                                 context,
-                                "完成 $good / ${items.size}",
+                                context.getString(R.string.batch_toast_done, good, items.size),
                                 Toast.LENGTH_SHORT,
                             ).show()
                         }
@@ -247,7 +258,14 @@ fun BatchScreen(onBack: () -> Unit) {
                         contentColor = MaterialTheme.colorScheme.onPrimary,
                     ),
                     modifier = Modifier.weight(1f).height(52.dp),
-                ) { Text(if (running) "处理中…" else "导出全部", style = MaterialTheme.typography.labelLarge) }
+                ) {
+                    Text(
+                        text = stringResource(
+                            if (running) R.string.batch_export_running else R.string.batch_export_all,
+                        ),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                }
             }
         }
     }
@@ -376,15 +394,12 @@ private fun saveBitmap(context: Context, bitmap: Bitmap, style: Style, settings:
         }
     }
     val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return false
-    val sized = bitmap.scaleForExport(settings.maxLongEdge)
     return try {
         context.contentResolver.openOutputStream(uri)?.use { out: OutputStream ->
-            sized.compress(Bitmap.CompressFormat.JPEG, settings.jpegQuality, out)
+            bitmap.compress(Bitmap.CompressFormat.JPEG, settings.jpegQuality, out)
         }
         true
     } catch (t: Throwable) {
         false
-    } finally {
-        if (sized !== bitmap) sized.recycle()
     }
 }

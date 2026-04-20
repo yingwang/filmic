@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Filmic</string>
+
+    <string name="tagline">三家色卷，一台相机。</string>
+    <string name="pick_photo">选择照片</string>
+    <string name="camera_button">拍摄</string>
+    <string name="batch_button">批量</string>
+
+    <string name="select_style_title">选择色卷</string>
+
+    <string name="styles_heading">色卷</string>
+    <string name="export">导出</string>
+    <string name="share">分享</string>
+    <string name="toast_saved">已保存到相册</string>
+    <string name="toast_save_failed">保存失败</string>
+    <string name="toast_share_failed">分享失败</string>
+    <string name="toast_capture_failed">拍摄失败</string>
+
+    <string name="batch_title">批量 (%1$d)</string>
+    <string name="batch_style_heading">色卷</string>
+    <string name="batch_no_selection">还没选照片。</string>
+    <string name="batch_processing">处理中 %1$d / %2$d</string>
+    <string name="batch_reselect">重选</string>
+    <string name="batch_export_all">导出全部</string>
+    <string name="batch_export_running">处理中…</string>
+    <string name="batch_toast_done">完成 %1$d / %2$d</string>
+
+    <string name="camera_permission_required">需要相机权限</string>
+    <string name="camera_starting">正在启动相机…</string>
+
+    <string name="adjust_tab_tone">色调</string>
+    <string name="adjust_tab_hsl">HSL</string>
+    <string name="adjust_reset">重置</string>
+    <string name="adjust_exposure">曝光</string>
+    <string name="adjust_contrast">对比</string>
+    <string name="adjust_saturation">饱和</string>
+    <string name="adjust_temperature">色温</string>
+    <string name="adjust_tint">色调偏移</string>
+    <string name="adjust_hue">色相</string>
+    <string name="adjust_sat">饱和</string>
+    <string name="adjust_lum">明度</string>
+    <string name="band_red">红</string>
+    <string name="band_orange">橙</string>
+    <string name="band_yellow">黄</string>
+    <string name="band_green">绿</string>
+    <string name="band_aqua">青</string>
+    <string name="band_blue">蓝</string>
+    <string name="band_purple">紫</string>
+    <string name="band_magenta">品</string>
+
+    <string name="export_settings_title">导出设置</string>
+    <string name="export_quality_label">JPEG 质量 · %1$d</string>
+    <string name="common_done">完成</string>
+
+    <string name="desc_hb_natural">清雅、肤色准、高光从容。</string>
+    <string name="desc_hb_xpan">泛广—冷影暖高，褪色胶片。</string>
+    <string name="desc_fj_classic_chrome">灰调、抬影、青橙分离。</string>
+    <string name="desc_fj_velvia">浓郁、反差大、绿红尤盛。</string>
+    <string name="desc_fj_astia">柔和、肤色温润、淡彩。</string>
+    <string name="desc_fj_acros">细腻黑白、微粒精致。</string>
+    <string name="desc_lc_standard">克制、微暖、层次见内。</string>
+    <string name="desc_lc_chrome">浓郁反差、暖中冷影、红更沉。</string>
+    <string name="desc_lc_mono">黑白、深黑、银盐颗粒。</string>
+</resources>

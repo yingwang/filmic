@@ -32,8 +32,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.yingwang.filmic.R
 import com.yingwang.filmic.lut.Style
 import com.yingwang.filmic.lut.Styles
 
@@ -50,7 +52,7 @@ fun StyleScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "SELECT STYLE",
+                        text = stringResource(R.string.select_style_title).uppercase(),
                         style = MaterialTheme.typography.titleMedium,
                     )
                 },
@@ -133,7 +135,7 @@ private fun StyleRow(style: Style, onClick: () -> Unit) {
             )
             Spacer(Modifier.height(2.dp))
             Text(
-                text = style.description,
+                text = style.localizedDescription(),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

@@ -31,8 +31,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.yingwang.filmic.R
 import com.yingwang.filmic.lut.Adjustments
 import kotlin.math.roundToInt
 
@@ -57,13 +59,13 @@ fun AdjustPanel(
             .padding(horizontal = 24.dp, vertical = 16.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            TabHeader("TONE", tab == Tab.Tone) { tab = Tab.Tone }
+            TabHeader(stringResource(R.string.adjust_tab_tone).uppercase(), tab == Tab.Tone) { tab = Tab.Tone }
             Spacer(Modifier.size(20.dp))
-            TabHeader("HSL", tab == Tab.Hsl) { tab = Tab.Hsl }
+            TabHeader(stringResource(R.string.adjust_tab_hsl), tab == Tab.Hsl) { tab = Tab.Hsl }
             Spacer(Modifier.weight(1f))
             TextButton(onClick = onReset) {
                 Text(
-                    "重置",
+                    text = stringResource(R.string.adjust_reset),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -99,25 +101,35 @@ private fun TabHeader(label: String, selected: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun ToneTab(adj: Adjustments, onChange: (Adjustments) -> Unit) {
-    AdjSlider("曝光", adj.exposure) { onChange(adj.copy(exposure = it)) }
-    AdjSlider("对比", adj.contrast) { onChange(adj.copy(contrast = it)) }
-    AdjSlider("饱和", adj.saturation) { onChange(adj.copy(saturation = it)) }
-    AdjSlider("色温", adj.temperature) { onChange(adj.copy(temperature = it)) }
-    AdjSlider("色调", adj.tint) { onChange(adj.copy(tint = it)) }
+    AdjSlider(stringResource(R.string.adjust_exposure), adj.exposure) { onChange(adj.copy(exposure = it)) }
+    AdjSlider(stringResource(R.string.adjust_contrast), adj.contrast) { onChange(adj.copy(contrast = it)) }
+    AdjSlider(stringResource(R.string.adjust_saturation), adj.saturation) { onChange(adj.copy(saturation = it)) }
+    AdjSlider(stringResource(R.string.adjust_temperature), adj.temperature) { onChange(adj.copy(temperature = it)) }
+    AdjSlider(stringResource(R.string.adjust_tint), adj.tint) { onChange(adj.copy(tint = it)) }
 }
 
 @Composable
 private fun HslTab(adj: Adjustments, onChange: (Adjustments) -> Unit) {
     var band by remember { mutableStateOf(0) }
+    val bandLabels = listOf(
+        stringResource(R.string.band_red),
+        stringResource(R.string.band_orange),
+        stringResource(R.string.band_yellow),
+        stringResource(R.string.band_green),
+        stringResource(R.string.band_aqua),
+        stringResource(R.string.band_blue),
+        stringResource(R.string.band_purple),
+        stringResource(R.string.band_magenta),
+    )
 
     LazyRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(end = 24.dp),
         modifier = Modifier.fillMaxWidth(),
     ) {
-        items(Adjustments.BAND_NAMES.size) { i ->
+        items(bandLabels.size) { i ->
             BandChip(
-                label = Adjustments.BAND_NAMES[i],
+                label = bandLabels[i],
                 color = bandColor(i),
                 selected = i == band,
                 onClick = { band = i },
@@ -125,13 +137,13 @@ private fun HslTab(adj: Adjustments, onChange: (Adjustments) -> Unit) {
         }
     }
     Spacer(Modifier.height(12.dp))
-    AdjSlider("色相", adj.hueShifts[band]) { v ->
+    AdjSlider(stringResource(R.string.adjust_hue), adj.hueShifts[band]) { v ->
         onChange(adj.copy(hueShifts = adj.hueShifts.replace(band, v)))
     }
-    AdjSlider("饱和", adj.satShifts[band]) { v ->
+    AdjSlider(stringResource(R.string.adjust_sat), adj.satShifts[band]) { v ->
         onChange(adj.copy(satShifts = adj.satShifts.replace(band, v)))
     }
-    AdjSlider("明度", adj.lumShifts[band]) { v ->
+    AdjSlider(stringResource(R.string.adjust_lum), adj.lumShifts[band]) { v ->
         onChange(adj.copy(lumShifts = adj.lumShifts.replace(band, v)))
     }
 }

@@ -1,9 +1,73 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Filmic</string>
-    <string name="pick_photo">选择照片</string>
-    <string name="no_photo">还没有照片。挑一张开始吧。</string>
-    <string name="export">导出</string>
-    <string name="original">原片</string>
-    <string name="tagline">三家色卷，一台相机。</string>
+
+    <!-- Import screen -->
+    <string name="tagline">Three film makers, one camera.</string>
+    <string name="pick_photo">Select Photo</string>
+    <string name="camera_button">Camera</string>
+    <string name="batch_button">Batch</string>
+
+    <!-- Style screen -->
+    <string name="select_style_title">SELECT STYLE</string>
+
+    <!-- Preview screen -->
+    <string name="styles_heading">STYLES</string>
+    <string name="export">Export</string>
+    <string name="share">Share</string>
+    <string name="toast_saved">Saved to gallery</string>
+    <string name="toast_save_failed">Save failed</string>
+    <string name="toast_share_failed">Share failed</string>
+    <string name="toast_capture_failed">Capture failed</string>
+
+    <!-- Batch screen -->
+    <string name="batch_title">BATCH (%1$d)</string>
+    <string name="batch_style_heading">STYLE</string>
+    <string name="batch_no_selection">No photos selected.</string>
+    <string name="batch_processing">Processing %1$d / %2$d</string>
+    <string name="batch_reselect">Reselect</string>
+    <string name="batch_export_all">Export All</string>
+    <string name="batch_export_running">Processing…</string>
+    <string name="batch_toast_done">Finished %1$d / %2$d</string>
+
+    <!-- Camera screen -->
+    <string name="camera_permission_required">Camera permission required</string>
+    <string name="camera_starting">Starting camera…</string>
+
+    <!-- Adjust panel -->
+    <string name="adjust_tab_tone">TONE</string>
+    <string name="adjust_tab_hsl">HSL</string>
+    <string name="adjust_reset">Reset</string>
+    <string name="adjust_exposure">Exposure</string>
+    <string name="adjust_contrast">Contrast</string>
+    <string name="adjust_saturation">Saturation</string>
+    <string name="adjust_temperature">Temperature</string>
+    <string name="adjust_tint">Tint</string>
+    <string name="adjust_hue">Hue</string>
+    <string name="adjust_sat">Sat</string>
+    <string name="adjust_lum">Luminance</string>
+    <string name="band_red">Red</string>
+    <string name="band_orange">Orange</string>
+    <string name="band_yellow">Yellow</string>
+    <string name="band_green">Green</string>
+    <string name="band_aqua">Aqua</string>
+    <string name="band_blue">Blue</string>
+    <string name="band_purple">Purple</string>
+    <string name="band_magenta">Magenta</string>
+
+    <!-- Export settings -->
+    <string name="export_settings_title">Export Settings</string>
+    <string name="export_quality_label">JPEG Quality · %1$d</string>
+    <string name="common_done">Done</string>
+
+    <!-- Style descriptions -->
+    <string name="desc_hb_natural">Clean, accurate skin tones, composed highlights.</string>
+    <string name="desc_hb_xpan">Panoramic film — cool shadows, warm highlights, faded.</string>
+    <string name="desc_fj_classic_chrome">Muted, lifted shadows, teal-orange split.</string>
+    <string name="desc_fj_velvia">Bold, high-contrast, greens and reds pushed.</string>
+    <string name="desc_fj_astia">Soft pastels, warm skin, delicate chroma.</string>
+    <string name="desc_fj_acros">Fine black-and-white with tight grain.</string>
+    <string name="desc_lc_standard">Restrained, subtly warm, depth in the midtones.</string>
+    <string name="desc_lc_chrome">Rich contrast, warm mids, cool shadows, deeper reds.</string>
+    <string name="desc_lc_mono">Monochrome, deep blacks, silver-halide grain.</string>
 </resources>

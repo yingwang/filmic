@@ -72,7 +72,6 @@ import com.yingwang.filmic.lut.Style
 import com.yingwang.filmic.lut.Styles
 import com.yingwang.filmic.settings.ExportSettings
 import com.yingwang.filmic.settings.rememberExportSettings
-import com.yingwang.filmic.settings.scaleForExport
 import java.io.File
 import java.io.OutputStream
 import kotlin.math.max
@@ -195,13 +194,13 @@ fun PreviewScreen(
             } else {
                 Column(modifier = Modifier.padding(horizontal = 24.dp)) {
                     Text(
-                        text = "${selectedStyle.brand.display} · ${selectedStyle.description}",
+                        text = "${selectedStyle.brand.display} · ${selectedStyle.localizedDescription()}",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        text = "STYLES",
+                        text = stringResource(R.string.styles_heading).uppercase(),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -242,7 +241,11 @@ fun PreviewScreen(
                             }
                             exporting = false
                             if (uri != null) startShare(context, uri)
-                            else Toast.makeText(context, "分享失败", Toast.LENGTH_SHORT).show()
+                            else Toast.makeText(
+                                context,
+                                context.getString(R.string.toast_share_failed),
+                                Toast.LENGTH_SHORT,
+                            ).show()
                         }
                     },
                     shape = RoundedCornerShape(2.dp),
@@ -252,7 +255,10 @@ fun PreviewScreen(
                 ) {
                     Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("分享".uppercase(), style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        text = stringResource(R.string.share).uppercase(),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
                 }
                 Button(
                     enabled = ready && !exporting,
@@ -267,7 +273,9 @@ fun PreviewScreen(
                             exporting = false
                             Toast.makeText(
                                 context,
-                                if (saved) "已保存到相册" else "保存失败",
+                                context.getString(
+                                    if (saved) R.string.toast_saved else R.string.toast_save_failed,
+                                ),
                                 Toast.LENGTH_SHORT,
                             ).show()
                         }
@@ -380,30 +388,24 @@ private fun saveToGallery(context: Context, bitmap: Bitmap, style: Style, settin
     }
     val resolver = context.contentResolver
     val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return false
-    val sized = bitmap.scaleForExport(settings.maxLongEdge)
     return try {
         resolver.openOutputStream(uri)?.use { out: OutputStream ->
-            sized.compress(Bitmap.CompressFormat.JPEG, settings.jpegQuality, out)
+            bitmap.compress(Bitmap.CompressFormat.JPEG, settings.jpegQuality, out)
         }
         true
     } catch (t: Throwable) {
         false
-    } finally {
-        if (sized !== bitmap) sized.recycle()
     }
 }
 
 private fun writeShareCache(context: Context, bitmap: Bitmap, style: Style, settings: ExportSettings): Uri? {
     val dir = File(context.cacheDir, "share").apply { mkdirs() }
     val file = File(dir, "Filmic_${style.id}_${System.currentTimeMillis()}.jpg")
-    val sized = bitmap.scaleForExport(settings.maxLongEdge)
     return try {
-        file.outputStream().use { sized.compress(Bitmap.CompressFormat.JPEG, settings.jpegQuality, it) }
+        file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, settings.jpegQuality, it) }
         FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
     } catch (t: Throwable) {
         null
-    } finally {
-        if (sized !== bitmap) sized.recycle()
     }
 }
 

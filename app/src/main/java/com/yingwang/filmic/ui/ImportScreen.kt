@@ -110,7 +110,10 @@ fun ImportScreen(
                         .weight(1f)
                         .height(52.dp),
                 ) {
-                    Text("拍摄".uppercase(), style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        text = stringResource(R.string.camera_button).uppercase(),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
                 }
                 OutlinedButton(
                     onClick = onBatch,
@@ -119,7 +122,10 @@ fun ImportScreen(
                         .weight(1f)
                         .height(52.dp),
                 ) {
-                    Text("批量".uppercase(), style = MaterialTheme.typography.labelLarge)
+                    Text(
+                        text = stringResource(R.string.batch_button).uppercase(),
+                        style = MaterialTheme.typography.labelLarge,
+                    )
                 }
             }
         }
