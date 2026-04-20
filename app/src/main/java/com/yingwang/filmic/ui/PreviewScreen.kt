@@ -4,7 +4,9 @@ import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.net.Uri
+import androidx.exifinterface.media.ExifInterface
 import android.os.Build
 import android.provider.MediaStore
 import android.widget.Toast
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -62,7 +65,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-@androidx.compose.material3.ExperimentalMaterial3Api
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun PreviewScreen(
     sourceUri: Uri?,
@@ -225,7 +228,31 @@ private fun chipColor(style: Style): Color = when (style.brand) {
 
 private fun loadBitmap(context: Context, uri: Uri): Bitmap? {
     val resolver = context.contentResolver
-    return resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
+    val raw = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) } ?: return null
+    val orientation = resolver.openInputStream(uri)?.use {
+        ExifInterface(it).getAttributeInt(
+            ExifInterface.TAG_ORIENTATION,
+            ExifInterface.ORIENTATION_NORMAL,
+        )
+    } ?: ExifInterface.ORIENTATION_NORMAL
+    return applyExifOrientation(raw, orientation)
+}
+
+private fun applyExifOrientation(bitmap: Bitmap, orientation: Int): Bitmap {
+    val m = Matrix()
+    when (orientation) {
+        ExifInterface.ORIENTATION_ROTATE_90 -> m.postRotate(90f)
+        ExifInterface.ORIENTATION_ROTATE_180 -> m.postRotate(180f)
+        ExifInterface.ORIENTATION_ROTATE_270 -> m.postRotate(270f)
+        ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> m.postScale(-1f, 1f)
+        ExifInterface.ORIENTATION_FLIP_VERTICAL -> m.postScale(1f, -1f)
+        ExifInterface.ORIENTATION_TRANSPOSE -> { m.postRotate(90f); m.postScale(-1f, 1f) }
+        ExifInterface.ORIENTATION_TRANSVERSE -> { m.postRotate(270f); m.postScale(-1f, 1f) }
+        else -> return bitmap
+    }
+    val rotated = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, m, true)
+    if (rotated != bitmap) bitmap.recycle()
+    return rotated
 }
 
 private fun saveToGallery(context: Context, bitmap: Bitmap, style: Style): Boolean {

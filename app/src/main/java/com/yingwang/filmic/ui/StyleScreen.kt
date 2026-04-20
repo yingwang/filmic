@@ -37,7 +37,7 @@ import coil.compose.AsyncImage
 import com.yingwang.filmic.lut.Style
 import com.yingwang.filmic.lut.Styles
 
-@androidx.compose.material3.ExperimentalMaterial3Api
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun StyleScreen(
     sourceUri: Uri?,
