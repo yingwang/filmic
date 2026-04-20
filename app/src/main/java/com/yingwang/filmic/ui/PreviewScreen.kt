@@ -33,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CompareArrows
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -64,14 +65,18 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.exifinterface.media.ExifInterface
 import com.yingwang.filmic.R
+import com.yingwang.filmic.lut.Adjustments
 import com.yingwang.filmic.lut.LutProcessor
 import com.yingwang.filmic.lut.Style
 import com.yingwang.filmic.lut.Styles
 import java.io.File
 import java.io.OutputStream
+import kotlin.math.max
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+private const val PREVIEW_LONG_EDGE = 1600
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -83,19 +88,23 @@ fun PreviewScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var selectedStyle by remember { mutableStateOf(styleId?.let(Styles::byId) ?: Styles.all.first()) }
-    var source by remember { mutableStateOf<Bitmap?>(null) }
+    var adjustments by remember { mutableStateOf(Adjustments()) }
+    var preview by remember { mutableStateOf<Bitmap?>(null) }
     var processed by remember { mutableStateOf<Bitmap?>(null) }
     var compareOn by remember { mutableStateOf(false) }
+    var adjustOn by remember { mutableStateOf(false) }
     var exporting by remember { mutableStateOf(false) }
 
     LaunchedEffect(sourceUri) {
-        source = withContext(Dispatchers.IO) { sourceUri?.let { loadBitmap(context, it) } }
+        preview = withContext(Dispatchers.IO) { sourceUri?.let { loadPreviewBitmap(context, it) } }
     }
-    LaunchedEffect(source, selectedStyle) {
-        val src = source ?: return@LaunchedEffect
-        processed = withContext(Dispatchers.Default) { LutProcessor.apply(src, selectedStyle, context) }
+    LaunchedEffect(preview, selectedStyle, adjustments) {
+        val src = preview ?: return@LaunchedEffect
+        processed = withContext(Dispatchers.Default) {
+            LutProcessor.apply(src, selectedStyle, context, adjustments)
+        }
     }
-    val ready by remember { derivedStateOf { source != null && processed != null } }
+    val ready by remember { derivedStateOf { preview != null && processed != null } }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -110,10 +119,15 @@ fun PreviewScreen(
                     }
                 },
                 actions = {
-                    IconButton(
-                        enabled = ready,
-                        onClick = { compareOn = !compareOn },
-                    ) {
+                    IconButton(enabled = ready, onClick = { adjustOn = !adjustOn }) {
+                        Icon(
+                            Icons.Default.Tune,
+                            contentDescription = "Adjust",
+                            tint = if (adjustOn) MaterialTheme.colorScheme.secondary
+                            else MaterialTheme.colorScheme.onBackground,
+                        )
+                    }
+                    IconButton(enabled = ready, onClick = { compareOn = !compareOn }) {
                         Icon(
                             Icons.Default.CompareArrows,
                             contentDescription = "Compare",
@@ -134,19 +148,18 @@ fun PreviewScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(inner)
-                .padding(horizontal = 24.dp),
+                .padding(inner),
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .padding(vertical = 12.dp)
+                    .padding(horizontal = 24.dp, vertical = 12.dp)
                     .clip(RoundedCornerShape(2.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center,
             ) {
-                val src = source
+                val src = preview
                 val out = processed
                 when {
                     out == null -> CircularProgressIndicator(strokeWidth = 2.dp)
@@ -164,30 +177,39 @@ fun PreviewScreen(
                 }
             }
 
-            Text(
-                text = "${selectedStyle.brand.display} · ${selectedStyle.description}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(16.dp))
-
-            Text(
-                text = "STYLES",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(8.dp))
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = PaddingValues(end = 24.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                items(Styles.all, key = { it.id }) { s ->
-                    StyleChip(
-                        style = s,
-                        selected = s.id == selectedStyle.id,
-                        onClick = { selectedStyle = s },
+            if (adjustOn) {
+                AdjustPanel(
+                    adjustments = adjustments,
+                    onChange = { adjustments = it },
+                    onReset = { adjustments = Adjustments() },
+                )
+            } else {
+                Column(modifier = Modifier.padding(horizontal = 24.dp)) {
+                    Text(
+                        text = "${selectedStyle.brand.display} · ${selectedStyle.description}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        text = "STYLES",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(end = 24.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        items(Styles.all, key = { it.id }) { s ->
+                            StyleChip(
+                                style = s,
+                                selected = s.id == selectedStyle.id,
+                                onClick = { selectedStyle = s },
+                            )
+                        }
+                    }
                 }
             }
 
@@ -196,14 +218,20 @@ fun PreviewScreen(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(horizontal = 24.dp)
                     .padding(bottom = 16.dp),
             ) {
                 OutlinedButton(
                     enabled = ready && !exporting,
                     onClick = {
-                        val bmp = processed ?: return@OutlinedButton
+                        exporting = true
                         scope.launch {
-                            val uri = withContext(Dispatchers.IO) { writeShareCache(context, bmp, selectedStyle) }
+                            val uri = withContext(Dispatchers.IO) {
+                                val full = sourceUri?.let { loadFullBitmap(context, it) } ?: return@withContext null
+                                val styled = LutProcessor.apply(full, selectedStyle, context, adjustments)
+                                writeShareCache(context, styled, selectedStyle)
+                            }
+                            exporting = false
                             if (uri != null) startShare(context, uri)
                             else Toast.makeText(context, "分享失败", Toast.LENGTH_SHORT).show()
                         }
@@ -220,10 +248,13 @@ fun PreviewScreen(
                 Button(
                     enabled = ready && !exporting,
                     onClick = {
-                        val bmp = processed ?: return@Button
                         exporting = true
                         scope.launch {
-                            val saved = withContext(Dispatchers.IO) { saveToGallery(context, bmp, selectedStyle) }
+                            val saved = withContext(Dispatchers.IO) {
+                                val full = sourceUri?.let { loadFullBitmap(context, it) } ?: return@withContext false
+                                val styled = LutProcessor.apply(full, selectedStyle, context, adjustments)
+                                saveToGallery(context, styled, selectedStyle)
+                            }
                             exporting = false
                             Toast.makeText(
                                 context,
@@ -279,9 +310,22 @@ private fun chipColor(style: Style): Color = when (style.brand) {
     Style.Brand.Leica -> if (style.monochrome) Color(0xFF1A1A1A) else Color(0xFFC8102E)
 }
 
-private fun loadBitmap(context: Context, uri: Uri): Bitmap? {
+private fun loadFullBitmap(context: Context, uri: Uri): Bitmap? = decodeOriented(context, uri, sampleSize = 1)
+
+private fun loadPreviewBitmap(context: Context, uri: Uri): Bitmap? {
+    // Read dimensions first to choose a sample size that lands near PREVIEW_LONG_EDGE.
+    val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
+    val long = max(opts.outWidth, opts.outHeight)
+    var sample = 1
+    while (long / (sample * 2) >= PREVIEW_LONG_EDGE) sample *= 2
+    return decodeOriented(context, uri, sample)
+}
+
+private fun decodeOriented(context: Context, uri: Uri, sampleSize: Int): Bitmap? {
     val resolver = context.contentResolver
-    val raw = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) } ?: return null
+    val opts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+    val raw = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) } ?: return null
     val orientation = resolver.openInputStream(uri)?.use {
         ExifInterface(it).getAttributeInt(
             ExifInterface.TAG_ORIENTATION,

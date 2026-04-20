@@ -25,12 +25,20 @@ import kotlin.random.Random
  */
 object LutProcessor {
 
-    fun apply(source: Bitmap, style: Style, context: Context? = null): Bitmap {
-        if (style.cubeAsset != null && context != null) {
+    fun apply(
+        source: Bitmap,
+        style: Style,
+        context: Context? = null,
+        adjustments: Adjustments = Adjustments(),
+    ): Bitmap {
+        val styled = if (style.cubeAsset != null && context != null) {
             val cube = LutCache.load(context, style.cubeAsset)
-            return applyCube(source, cube, style)
+            applyCube(source, cube, style)
+        } else {
+            applyMatrix(source, style)
         }
-        return applyMatrix(source, style)
+        AdjustmentProcessor.applyInPlace(styled, adjustments)
+        return styled
     }
 
     // region Matrix path
