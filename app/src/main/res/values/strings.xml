@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Filmic</string>
+    <string name="pick_photo">选择照片</string>
+    <string name="no_photo">还没有照片。挑一张开始吧。</string>
+    <string name="export">导出</string>
+    <string name="original">原片</string>
+    <string name="tagline">三家色卷，一台相机。</string>
+</resources>
