@@ -2,23 +2,24 @@ package com.yingwang.filmic.ui
 
 import android.content.ContentValues
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.net.Uri
-import androidx.exifinterface.media.ExifInterface
 import android.os.Build
 import android.provider.MediaStore
 import android.widget.Toast
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,18 +31,22 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CompareArrows
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,10 +61,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
+import androidx.exifinterface.media.ExifInterface
 import com.yingwang.filmic.R
 import com.yingwang.filmic.lut.LutProcessor
 import com.yingwang.filmic.lut.Style
 import com.yingwang.filmic.lut.Styles
+import java.io.File
 import java.io.OutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -77,6 +85,7 @@ fun PreviewScreen(
     var selectedStyle by remember { mutableStateOf(styleId?.let(Styles::byId) ?: Styles.all.first()) }
     var source by remember { mutableStateOf<Bitmap?>(null) }
     var processed by remember { mutableStateOf<Bitmap?>(null) }
+    var compareOn by remember { mutableStateOf(false) }
     var exporting by remember { mutableStateOf(false) }
 
     LaunchedEffect(sourceUri) {
@@ -84,28 +93,40 @@ fun PreviewScreen(
     }
     LaunchedEffect(source, selectedStyle) {
         val src = source ?: return@LaunchedEffect
-        processed = withContext(Dispatchers.Default) { LutProcessor.apply(src, selectedStyle) }
+        processed = withContext(Dispatchers.Default) { LutProcessor.apply(src, selectedStyle, context) }
     }
+    val ready by remember { derivedStateOf { source != null && processed != null } }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        selectedStyle.name.uppercase(),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
+                    Text(selectedStyle.name.uppercase(), style = MaterialTheme.typography.titleMedium)
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(
+                        enabled = ready,
+                        onClick = { compareOn = !compareOn },
+                    ) {
+                        Icon(
+                            Icons.Default.CompareArrows,
+                            contentDescription = "Compare",
+                            tint = if (compareOn) MaterialTheme.colorScheme.secondary
+                            else MaterialTheme.colorScheme.onBackground,
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onBackground,
                     navigationIconContentColor = MaterialTheme.colorScheme.onBackground,
+                    actionIconContentColor = MaterialTheme.colorScheme.onBackground,
                 ),
             )
         },
@@ -119,31 +140,36 @@ fun PreviewScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(3f / 2f)
+                    .weight(1f)
+                    .padding(vertical = 12.dp)
                     .clip(RoundedCornerShape(2.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center,
             ) {
-                val bmp = processed
-                if (bmp != null) {
-                    androidx.compose.foundation.Image(
-                        bitmap = bmp.asImageBitmap(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
+                val src = source
+                val out = processed
+                when {
+                    out == null -> CircularProgressIndicator(strokeWidth = 2.dp)
+                    compareOn && src != null -> CompareView(
+                        original = src.asImageBitmap(),
+                        processed = out.asImageBitmap(),
                         modifier = Modifier.fillMaxSize(),
                     )
-                } else {
-                    CircularProgressIndicator(strokeWidth = 2.dp)
+                    else -> Image(
+                        bitmap = out.asImageBitmap(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
             Text(
                 text = "${selectedStyle.brand.display} · ${selectedStyle.description}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(16.dp))
 
             Text(
                 text = "STYLES",
@@ -151,7 +177,11 @@ fun PreviewScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(8.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(end = 24.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 items(Styles.all, key = { it.id }) { s ->
                     StyleChip(
                         style = s,
@@ -161,35 +191,58 @@ fun PreviewScreen(
                 }
             }
 
-            Spacer(Modifier.height(28.dp))
-            Button(
-                enabled = processed != null && !exporting,
-                onClick = {
-                    val bmp = processed ?: return@Button
-                    exporting = true
-                    scope.launch {
-                        val saved = withContext(Dispatchers.IO) { saveToGallery(context, bmp, selectedStyle) }
-                        exporting = false
-                        Toast.makeText(
-                            context,
-                            if (saved) "已保存到相册" else "保存失败",
-                            Toast.LENGTH_SHORT,
-                        ).show()
-                    }
-                },
-                shape = RoundedCornerShape(2.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
+            Spacer(Modifier.height(20.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
+                    .padding(bottom = 16.dp),
             ) {
-                Text(
-                    text = stringResource(R.string.export).uppercase(),
-                    style = MaterialTheme.typography.labelLarge,
-                )
+                OutlinedButton(
+                    enabled = ready && !exporting,
+                    onClick = {
+                        val bmp = processed ?: return@OutlinedButton
+                        scope.launch {
+                            val uri = withContext(Dispatchers.IO) { writeShareCache(context, bmp, selectedStyle) }
+                            if (uri != null) startShare(context, uri)
+                            else Toast.makeText(context, "分享失败", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    shape = RoundedCornerShape(2.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("分享".uppercase(), style = MaterialTheme.typography.labelLarge)
+                }
+                Button(
+                    enabled = ready && !exporting,
+                    onClick = {
+                        val bmp = processed ?: return@Button
+                        exporting = true
+                        scope.launch {
+                            val saved = withContext(Dispatchers.IO) { saveToGallery(context, bmp, selectedStyle) }
+                            exporting = false
+                            Toast.makeText(
+                                context,
+                                if (saved) "已保存到相册" else "保存失败",
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        }
+                    },
+                    shape = RoundedCornerShape(2.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
+                ) {
+                    Text(stringResource(R.string.export).uppercase(), style = MaterialTheme.typography.labelLarge)
+                }
             }
         }
     }
@@ -274,4 +327,27 @@ private fun saveToGallery(context: Context, bitmap: Bitmap, style: Style): Boole
     } catch (t: Throwable) {
         false
     }
+}
+
+private fun writeShareCache(context: Context, bitmap: Bitmap, style: Style): Uri? {
+    val dir = File(context.cacheDir, "share").apply { mkdirs() }
+    val file = File(dir, "Filmic_${style.id}_${System.currentTimeMillis()}.jpg")
+    return try {
+        file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 94, it) }
+        FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    } catch (t: Throwable) {
+        null
+    }
+}
+
+private fun startShare(context: Context, uri: Uri) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "image/jpeg"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    val chooser = Intent.createChooser(intent, null).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    context.startActivity(chooser)
 }

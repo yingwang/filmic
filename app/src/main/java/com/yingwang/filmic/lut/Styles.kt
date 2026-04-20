@@ -3,11 +3,16 @@ package com.yingwang.filmic.lut
 import com.yingwang.filmic.lut.Style.Brand
 
 /**
- * Built-in presets. These are approximations — each brand's true color science
- * involves proprietary per-channel LUTs and gamut mapping. Replace matrices with
- * .cube LUTs once we have a calibration pipeline.
+ * Built-in presets.
+ *
+ * Matrix-based styles are hand-tuned approximations. Cube-based styles pull a
+ * bundled .cube LUT from `assets/lut/` — those are generated with non-linear
+ * operations (split-tone, S-curve, selective desat) that a 3×4 matrix can't
+ * reproduce.
  */
 object Styles {
+
+    // region Matrix presets
 
     val Hasselblad_Natural = Style(
         id = "hb_natural",
@@ -60,6 +65,25 @@ object Styles {
         highlightRoll = 0.02f,
     )
 
+    val Fuji_Acros = Style(
+        id = "fj_acros",
+        brand = Brand.Fujifilm,
+        name = "Acros",
+        description = "细腻黑白、微粒精致。",
+        matrix = floatArrayOf(
+            0.25f, 0.62f, 0.13f, 0f, 0f,
+            0.25f, 0.62f, 0.13f, 0f, 0f,
+            0.25f, 0.62f, 0.13f, 0f, 0f,
+            0f, 0f, 0f, 1f, 0f,
+        ),
+        contrast = 1.12f,
+        saturation = 0f,
+        shadowLift = 0.02f,
+        highlightRoll = 0.06f,
+        grain = 0.06f,
+        monochrome = true,
+    )
+
     val Leica_Standard = Style(
         id = "lc_standard",
         brand = Brand.Leica,
@@ -96,11 +120,46 @@ object Styles {
         monochrome = true,
     )
 
+    // endregion
+
+    // region Cube-based presets
+
+    val Hasselblad_XPan = Style(
+        id = "hb_xpan",
+        brand = Brand.Hasselblad,
+        name = "XPan",
+        description = "泛广—冷影暖高，褪色胶片。",
+        cubeAsset = "lut/hasselblad_xpan.cube",
+        grain = 0.04f,
+    )
+
+    val Fuji_Astia = Style(
+        id = "fj_astia",
+        brand = Brand.Fujifilm,
+        name = "Astia",
+        description = "柔和、肤色温润、淡彩。",
+        cubeAsset = "lut/fuji_astia.cube",
+    )
+
+    val Leica_Chrome = Style(
+        id = "lc_chrome",
+        brand = Brand.Leica,
+        name = "Chrome",
+        description = "浓郁反差、暖中冷影、红更沉。",
+        cubeAsset = "lut/leica_chrome.cube",
+    )
+
+    // endregion
+
     val all: List<Style> = listOf(
         Hasselblad_Natural,
+        Hasselblad_XPan,
         Fuji_ClassicChrome,
         Fuji_Velvia,
+        Fuji_Astia,
+        Fuji_Acros,
         Leica_Standard,
+        Leica_Chrome,
         Leica_Monochrom,
     )
 
