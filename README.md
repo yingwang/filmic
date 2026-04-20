@@ -2,6 +2,14 @@
 
 Android photo styling app — applies color grades inspired by **Hasselblad**, **Fujifilm**, and **Leica**. Edit from the gallery, shoot with a live LUT, or batch-convert.
 
+<p align="center">
+  <img src="docs/screenshots/01_home.png" width="260" alt="Home" />
+  <img src="docs/screenshots/02_styles.png" width="260" alt="Style selection" />
+  <img src="docs/screenshots/03_compare.png" width="260" alt="Compare slider" />
+</p>
+
+<p align="center"><em>Home · Style selection · Compare slider (drag to reveal original)</em></p>
+
 ## Features
 
 ### Import
