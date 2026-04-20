@@ -1,14 +1,11 @@
 package com.yingwang.filmic.ui
 
-import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.net.Uri
-import android.os.Build
-import android.provider.MediaStore
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -66,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.exifinterface.media.ExifInterface
 import com.yingwang.filmic.R
+import com.yingwang.filmic.io.MediaSaver
 import com.yingwang.filmic.lut.Adjustments
 import com.yingwang.filmic.lut.LutProcessor
 import com.yingwang.filmic.lut.Style
@@ -73,7 +71,6 @@ import com.yingwang.filmic.lut.Styles
 import com.yingwang.filmic.settings.ExportSettings
 import com.yingwang.filmic.settings.rememberExportSettings
 import java.io.File
-import java.io.OutputStream
 import kotlin.math.max
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -377,26 +374,8 @@ private fun applyExifOrientation(bitmap: Bitmap, orientation: Int): Bitmap {
     return rotated
 }
 
-private fun saveToGallery(context: Context, bitmap: Bitmap, style: Style, settings: ExportSettings): Boolean {
-    val fileName = "Filmic_${style.id}_${System.currentTimeMillis()}.jpg"
-    val values = ContentValues().apply {
-        put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
-        put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Filmic")
-        }
-    }
-    val resolver = context.contentResolver
-    val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return false
-    return try {
-        resolver.openOutputStream(uri)?.use { out: OutputStream ->
-            bitmap.compress(Bitmap.CompressFormat.JPEG, settings.jpegQuality, out)
-        }
-        true
-    } catch (t: Throwable) {
-        false
-    }
-}
+private fun saveToGallery(context: Context, bitmap: Bitmap, style: Style, settings: ExportSettings): Boolean =
+    MediaSaver.saveBitmap(context, bitmap, style, settings.jpegQuality)
 
 private fun writeShareCache(context: Context, bitmap: Bitmap, style: Style, settings: ExportSettings): Uri? {
     val dir = File(context.cacheDir, "share").apply { mkdirs() }

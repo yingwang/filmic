@@ -1,13 +1,7 @@
 package com.yingwang.filmic.ui
 
-import android.content.ContentValues
 import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Matrix
 import android.net.Uri
-import android.os.Build
-import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -64,15 +58,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.exifinterface.media.ExifInterface
 import coil.compose.AsyncImage
 import com.yingwang.filmic.R
+import com.yingwang.filmic.io.MediaSaver
 import com.yingwang.filmic.lut.LutProcessor
 import com.yingwang.filmic.lut.Style
 import com.yingwang.filmic.lut.Styles
 import com.yingwang.filmic.settings.ExportSettings
 import com.yingwang.filmic.settings.rememberExportSettings
-import java.io.OutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -353,53 +346,10 @@ private fun chipColorFor(style: Style): Color = when (style.brand) {
 }
 
 private fun processOne(context: Context, uri: Uri, style: Style, settings: ExportSettings): Boolean {
-    val raw = decodeOriented(context, uri) ?: return false
+    val raw = MediaSaver.decodeOriented(context, uri) ?: return false
     val styled = LutProcessor.apply(raw, style, context)
     raw.recycle()
-    val saved = saveBitmap(context, styled, style, settings)
+    val saved = MediaSaver.saveBitmap(context, styled, style, settings.jpegQuality)
     styled.recycle()
     return saved
-}
-
-private fun decodeOriented(context: Context, uri: Uri): Bitmap? {
-    val resolver = context.contentResolver
-    val raw = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) } ?: return null
-    val orientation = resolver.openInputStream(uri)?.use {
-        ExifInterface(it).getAttributeInt(
-            ExifInterface.TAG_ORIENTATION,
-            ExifInterface.ORIENTATION_NORMAL,
-        )
-    } ?: ExifInterface.ORIENTATION_NORMAL
-    val m = Matrix()
-    when (orientation) {
-        ExifInterface.ORIENTATION_ROTATE_90 -> m.postRotate(90f)
-        ExifInterface.ORIENTATION_ROTATE_180 -> m.postRotate(180f)
-        ExifInterface.ORIENTATION_ROTATE_270 -> m.postRotate(270f)
-        ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> m.postScale(-1f, 1f)
-        ExifInterface.ORIENTATION_FLIP_VERTICAL -> m.postScale(1f, -1f)
-        else -> return raw
-    }
-    val rotated = Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, m, true)
-    if (rotated != raw) raw.recycle()
-    return rotated
-}
-
-private fun saveBitmap(context: Context, bitmap: Bitmap, style: Style, settings: ExportSettings): Boolean {
-    val fileName = "Filmic_${style.id}_${System.currentTimeMillis()}.jpg"
-    val values = ContentValues().apply {
-        put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
-        put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Filmic")
-        }
-    }
-    val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return false
-    return try {
-        context.contentResolver.openOutputStream(uri)?.use { out: OutputStream ->
-            bitmap.compress(Bitmap.CompressFormat.JPEG, settings.jpegQuality, out)
-        }
-        true
-    } catch (t: Throwable) {
-        false
-    }
 }

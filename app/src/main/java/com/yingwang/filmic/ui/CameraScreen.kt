@@ -1,16 +1,12 @@
 package com.yingwang.filmic.ui
 
 import android.Manifest
-import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Matrix
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.provider.MediaStore
 import android.util.Size
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -75,6 +71,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.yingwang.filmic.R
+import com.yingwang.filmic.io.MediaSaver
 import com.yingwang.filmic.lut.LutProcessor
 import com.yingwang.filmic.lut.Style
 import com.yingwang.filmic.lut.Styles
@@ -321,6 +318,12 @@ private fun ShutterButton(enabled: Boolean, onClick: () -> Unit) {
     }
 }
 
+/**
+ * Take an in-memory capture, apply the LUT, and write the styled JPEG to the
+ * gallery. We don't use ImageCapture's file output path because we'd then have
+ * to re-decode and re-encode just to apply the style — instead, capture the
+ * raw bitmap, do LUT in one shot, and save with MediaSaver.
+ */
 private fun captureToGallery(
     context: Context,
     imageCapture: ImageCapture,
@@ -328,52 +331,31 @@ private fun captureToGallery(
     settings: ExportSettings,
     onComplete: (Boolean) -> Unit,
 ) {
-    val outputOptions = buildOutputOptions(context, style)
     imageCapture.takePicture(
-        outputOptions,
         ContextCompat.getMainExecutor(context),
-        object : ImageCapture.OnImageSavedCallback {
+        object : ImageCapture.OnImageCapturedCallback() {
             override fun onError(exception: ImageCaptureException) {
                 onComplete(false)
             }
 
-            override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                val saved = output.savedUri ?: run { onComplete(false); return }
+            override fun onCaptureSuccess(image: ImageProxy) {
+                val rotation = image.imageInfo.rotationDegrees
+                val raw = try { image.toBitmap() } catch (t: Throwable) { null }
+                image.close()
+                if (raw == null) {
+                    onComplete(false); return
+                }
                 Thread {
-                    try {
-                        val raw = context.contentResolver.openInputStream(saved)?.use {
-                            BitmapFactory.decodeStream(it)
-                        } ?: run { onComplete(false); return@Thread }
-                        val styled = LutProcessor.apply(raw, style, context)
-                        raw.recycle()
-                        context.contentResolver.openOutputStream(saved, "wt")?.use { out ->
-                            styled.compress(Bitmap.CompressFormat.JPEG, settings.jpegQuality, out)
-                        }
-                        styled.recycle()
-                        onComplete(true)
-                    } catch (t: Throwable) {
-                        onComplete(false)
-                    }
+                    val oriented = rotate(raw, rotation)
+                    val styled = LutProcessor.apply(oriented, style, context)
+                    if (oriented !== styled) oriented.recycle()
+                    val ok = MediaSaver.saveBitmap(context, styled, style, settings.jpegQuality)
+                    styled.recycle()
+                    onComplete(ok)
                 }.start()
             }
         },
     )
-}
-
-private fun buildOutputOptions(context: Context, style: Style): ImageCapture.OutputFileOptions {
-    val name = "Filmic_${style.id}_${System.currentTimeMillis()}.jpg"
-    val values = ContentValues().apply {
-        put(MediaStore.Images.Media.DISPLAY_NAME, name)
-        put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/Filmic")
-        }
-    }
-    return ImageCapture.OutputFileOptions.Builder(
-        context.contentResolver,
-        MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-        values,
-    ).build()
 }
 
 private fun ImageProxy.toRotatedBitmap(): Bitmap? {
