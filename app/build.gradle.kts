@@ -43,6 +43,11 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+        jniLibs {
+            // Ship native libraries uncompressed so Android 15+ devices with
+            // 16 KB page sizes can mmap them without extraction.
+            useLegacyPackaging = false
+        }
     }
 }
 
@@ -66,7 +71,8 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("androidx.exifinterface:exifinterface:1.3.7")
 
-    val cameraxVersion = "1.3.4"
+    // CameraX 1.4+ ships 16 KB page-aligned native libraries for Android 15.
+    val cameraxVersion = "1.4.1"
     implementation("androidx.camera:camera-core:$cameraxVersion")
     implementation("androidx.camera:camera-camera2:$cameraxVersion")
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")

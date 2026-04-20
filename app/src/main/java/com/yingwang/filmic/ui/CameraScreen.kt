@@ -22,6 +22,7 @@ import androidx.camera.core.Preview
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -68,21 +69,24 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.yingwang.filmic.lut.LutProcessor
 import com.yingwang.filmic.lut.Style
 import com.yingwang.filmic.lut.Styles
+import com.yingwang.filmic.settings.ExportSettings
+import com.yingwang.filmic.settings.rememberExportSettings
+import com.yingwang.filmic.settings.scaleForExport
 import java.util.concurrent.Executors
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Live camera preview with the active style applied to each analysis frame.
- *
- * Frames flow ImageAnalysis → YUV→ARGB Bitmap → LutProcessor → Compose Image.
- * Capture button triggers ImageCapture (full-res JPEG), then we re-decode and
- * apply the same style before saving to the gallery.
+ * Live camera preview. The bottom layer is a real CameraX [PreviewView] so the
+ * frame is never black while we wait for analysis. On top, we overlay a
+ * LUT-processed image built from ImageAnalysis frames — it fades in once
+ * frames start arriving, and is just decoration; the shutter applies the style
+ * to the full-res capture.
  */
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -90,6 +94,7 @@ fun CameraScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
+    val settings = rememberExportSettings()
 
     var hasPermission by remember {
         mutableStateOf(
@@ -105,12 +110,20 @@ fun CameraScreen(onBack: () -> Unit) {
     }
 
     var selectedStyle by remember { mutableStateOf(Styles.all.first()) }
-    var frame by remember { mutableStateOf<Bitmap?>(null) }
+    var overlayFrame by remember { mutableStateOf<Bitmap?>(null) }
     var capturing by remember { mutableStateOf(false) }
     val imageCapture = remember { ImageCapture.Builder().build() }
+    val previewUseCase = remember { Preview.Builder().build() }
     val analyzerExecutor = remember { Executors.newSingleThreadExecutor() }
+    val previewView = remember {
+        PreviewView(context).apply {
+            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+            scaleType = PreviewView.ScaleType.FIT_CENTER
+        }
+    }
 
     DisposableEffect(Unit) {
+        previewUseCase.setSurfaceProvider(previewView.surfaceProvider)
         onDispose { analyzerExecutor.shutdown() }
     }
 
@@ -124,36 +137,54 @@ fun CameraScreen(onBack: () -> Unit) {
             .setResolutionSelector(
                 ResolutionSelector.Builder()
                     .setResolutionStrategy(
-                        ResolutionStrategy(Size(720, 960), ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER),
+                        ResolutionStrategy(
+                            Size(720, 960),
+                            ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER,
+                        ),
                     )
                     .build(),
             )
             .build()
 
         analysis.setAnalyzer(analyzerExecutor) { image ->
-            val bmp = image.toRotatedBitmap() ?: run { image.close(); return@setAnalyzer }
+            val bmp = image.toRotatedBitmap()
             image.close()
-            val styled = LutProcessor.apply(bmp, selectedStyle, context)
+            if (bmp == null) return@setAnalyzer
+            val styled = try {
+                LutProcessor.apply(bmp, selectedStyle, context)
+            } catch (t: Throwable) {
+                null
+            }
             bmp.recycle()
-            frame = styled
+            overlayFrame = styled
         }
 
-        provider.bindToLifecycle(
-            lifecycle,
-            CameraSelector.DEFAULT_BACK_CAMERA,
-            analysis,
-            imageCapture,
-            Preview.Builder().build(), // attach a no-op preview so 3A converges
-        )
+        try {
+            provider.bindToLifecycle(
+                lifecycle,
+                CameraSelector.DEFAULT_BACK_CAMERA,
+                previewUseCase,
+                analysis,
+                imageCapture,
+            )
+        } catch (t: Throwable) {
+            // Some devices can't run Preview + Analysis + Capture together.
+            // Fall back to Preview + Capture only (no live LUT overlay).
+            provider.unbindAll()
+            provider.bindToLifecycle(
+                lifecycle,
+                CameraSelector.DEFAULT_BACK_CAMERA,
+                previewUseCase,
+                imageCapture,
+            )
+        }
     }
 
     Scaffold(
         containerColor = Color.Black,
         topBar = {
             TopAppBar(
-                title = {
-                    Text(selectedStyle.name.uppercase(), style = MaterialTheme.typography.titleMedium)
-                },
+                title = { Text(selectedStyle.name.uppercase(), style = MaterialTheme.typography.titleMedium) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
@@ -184,7 +215,11 @@ fun CameraScreen(onBack: () -> Unit) {
                 if (!hasPermission) {
                     Text("需要相机权限", color = Color.White, style = MaterialTheme.typography.bodyMedium)
                 } else {
-                    val f = frame
+                    AndroidView(
+                        factory = { previewView },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    val f = overlayFrame
                     if (f != null) {
                         Image(
                             bitmap = f.asImageBitmap(),
@@ -192,8 +227,6 @@ fun CameraScreen(onBack: () -> Unit) {
                             contentScale = ContentScale.Fit,
                             modifier = Modifier.fillMaxSize(),
                         )
-                    } else {
-                        Text("正在启动相机…", color = Color.White, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
@@ -226,15 +259,14 @@ fun CameraScreen(onBack: () -> Unit) {
                         context = context,
                         imageCapture = imageCapture,
                         style = selectedStyle,
+                        settings = settings.value,
                         onComplete = { ok ->
                             capturing = false
-                            scope.launch {
-                                Toast.makeText(
-                                    context,
-                                    if (ok) "已保存到相册" else "拍摄失败",
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                            }
+                            Toast.makeText(
+                                context,
+                                if (ok) "已保存到相册" else "拍摄失败",
+                                Toast.LENGTH_SHORT,
+                            ).show()
                         },
                     )
                 }
@@ -272,18 +304,8 @@ private fun ShutterButton(enabled: Boolean, onClick: () -> Unit) {
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Box(
-            modifier = Modifier
-                .size(60.dp)
-                .clip(CircleShape)
-                .background(Color.Black),
-        )
-        Box(
-            modifier = Modifier
-                .size(54.dp)
-                .clip(CircleShape)
-                .background(Color.White),
-        )
+        Box(modifier = Modifier.size(60.dp).clip(CircleShape).background(Color.Black))
+        Box(modifier = Modifier.size(54.dp).clip(CircleShape).background(Color.White))
     }
 }
 
@@ -291,6 +313,7 @@ private fun captureToGallery(
     context: Context,
     imageCapture: ImageCapture,
     style: Style,
+    settings: ExportSettings,
     onComplete: (Boolean) -> Unit,
 ) {
     val outputOptions = buildOutputOptions(context, style)
@@ -303,24 +326,20 @@ private fun captureToGallery(
             }
 
             override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                val saved = output.savedUri
-                if (saved == null) {
-                    onComplete(false)
-                    return
-                }
+                val saved = output.savedUri ?: run { onComplete(false); return }
                 Thread {
                     try {
                         val raw = context.contentResolver.openInputStream(saved)?.use {
                             BitmapFactory.decodeStream(it)
-                        }
-                        if (raw == null) {
-                            onComplete(false); return@Thread
-                        }
+                        } ?: run { onComplete(false); return@Thread }
                         val styled = LutProcessor.apply(raw, style, context)
+                        raw.recycle()
+                        val sized = styled.scaleForExport(settings.maxLongEdge)
+                        if (sized !== styled) styled.recycle()
                         context.contentResolver.openOutputStream(saved, "wt")?.use { out ->
-                            styled.compress(Bitmap.CompressFormat.JPEG, 94, out)
+                            sized.compress(Bitmap.CompressFormat.JPEG, settings.jpegQuality, out)
                         }
-                        styled.recycle()
+                        sized.recycle()
                         onComplete(true)
                     } catch (t: Throwable) {
                         onComplete(false)

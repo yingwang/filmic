@@ -18,6 +18,11 @@ Android photo styling app — applies color grades inspired by **Hasselblad**, *
 - Sliders drive a downsampled preview (≤1600 px long edge) for live response; export re-processes the full-res source
 - Share sheet and Save-to-gallery both respect current style + adjustments
 
+### Export settings
+- JPEG quality 60–100 (default 94) — affects Save, Share, Camera capture, and Batch
+- Output size: original, 4000 px, 2000 px, or 1000 px (long edge; aspect preserved)
+- Persisted via `SharedPreferences` so choices survive relaunch
+
 ## Styles (9 built-in)
 
 | Brand | Name | Engine | Description |
@@ -51,10 +56,11 @@ display / export
 
 - Kotlin 2.0 · Compose BOM 2024.09 · Material 3
 - Navigation Compose
-- CameraX 1.3 (core / camera2 / lifecycle / view)
+- CameraX 1.4 (core / camera2 / lifecycle / view) — 16 KB page-aligned native libs for Android 15
 - androidx.exifinterface (EXIF orientation)
 - Coil (thumbnails)
 - FileProvider for share intents
+- `android.packaging.jniLibs.useLegacyPackaging = false` — ships `.so` files uncompressed and page-aligned
 
 ## Build
 

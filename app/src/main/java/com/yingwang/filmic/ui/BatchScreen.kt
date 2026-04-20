@@ -36,6 +36,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -67,6 +68,9 @@ import coil.compose.AsyncImage
 import com.yingwang.filmic.lut.LutProcessor
 import com.yingwang.filmic.lut.Style
 import com.yingwang.filmic.lut.Styles
+import com.yingwang.filmic.settings.ExportSettings
+import com.yingwang.filmic.settings.rememberExportSettings
+import com.yingwang.filmic.settings.scaleForExport
 import java.io.OutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -84,6 +88,8 @@ fun BatchScreen(onBack: () -> Unit) {
     val items = remember { mutableStateListOf<Uri>() }
     var selectedStyle by remember { mutableStateOf(Styles.all.first()) }
     var processingIndex by remember { mutableStateOf<Int?>(null) }
+    var settingsOn by remember { mutableStateOf(false) }
+    val exportSettings = rememberExportSettings()
     val results = remember { mutableStateListOf<BatchItemState>() }
     val running by remember { derivedStateOf { processingIndex != null } }
 
@@ -112,6 +118,11 @@ fun BatchScreen(onBack: () -> Unit) {
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { settingsOn = true }) {
+                        Icon(Icons.Default.Settings, contentDescription = "Export settings")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -217,7 +228,7 @@ fun BatchScreen(onBack: () -> Unit) {
                             for (i in items.indices) {
                                 processingIndex = i
                                 val ok = withContext(Dispatchers.IO) {
-                                    processOne(context, items[i], selectedStyle)
+                                    processOne(context, items[i], selectedStyle, exportSettings.value)
                                 }
                                 results[i] = if (ok) BatchItemState.Done else BatchItemState.Failed
                             }
@@ -239,6 +250,14 @@ fun BatchScreen(onBack: () -> Unit) {
                 ) { Text(if (running) "处理中…" else "导出全部", style = MaterialTheme.typography.labelLarge) }
             }
         }
+    }
+
+    if (settingsOn) {
+        ExportSettingsDialog(
+            settings = exportSettings.value,
+            onChange = { exportSettings.value = it },
+            onDismiss = { settingsOn = false },
+        )
     }
 }
 
@@ -315,11 +334,11 @@ private fun chipColorFor(style: Style): Color = when (style.brand) {
     Style.Brand.Leica -> if (style.monochrome) Color(0xFF1A1A1A) else Color(0xFFC8102E)
 }
 
-private fun processOne(context: Context, uri: Uri, style: Style): Boolean {
+private fun processOne(context: Context, uri: Uri, style: Style, settings: ExportSettings): Boolean {
     val raw = decodeOriented(context, uri) ?: return false
     val styled = LutProcessor.apply(raw, style, context)
     raw.recycle()
-    val saved = saveBitmap(context, styled, style)
+    val saved = saveBitmap(context, styled, style, settings)
     styled.recycle()
     return saved
 }
@@ -347,7 +366,7 @@ private fun decodeOriented(context: Context, uri: Uri): Bitmap? {
     return rotated
 }
 
-private fun saveBitmap(context: Context, bitmap: Bitmap, style: Style): Boolean {
+private fun saveBitmap(context: Context, bitmap: Bitmap, style: Style, settings: ExportSettings): Boolean {
     val fileName = "Filmic_${style.id}_${System.currentTimeMillis()}.jpg"
     val values = ContentValues().apply {
         put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
@@ -357,12 +376,15 @@ private fun saveBitmap(context: Context, bitmap: Bitmap, style: Style): Boolean 
         }
     }
     val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return false
+    val sized = bitmap.scaleForExport(settings.maxLongEdge)
     return try {
         context.contentResolver.openOutputStream(uri)?.use { out: OutputStream ->
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 94, out)
+            sized.compress(Bitmap.CompressFormat.JPEG, settings.jpegQuality, out)
         }
         true
     } catch (t: Throwable) {
         false
+    } finally {
+        if (sized !== bitmap) sized.recycle()
     }
 }

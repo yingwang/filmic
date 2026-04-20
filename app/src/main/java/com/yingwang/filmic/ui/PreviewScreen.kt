@@ -32,6 +32,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CompareArrows
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
@@ -69,6 +70,9 @@ import com.yingwang.filmic.lut.Adjustments
 import com.yingwang.filmic.lut.LutProcessor
 import com.yingwang.filmic.lut.Style
 import com.yingwang.filmic.lut.Styles
+import com.yingwang.filmic.settings.ExportSettings
+import com.yingwang.filmic.settings.rememberExportSettings
+import com.yingwang.filmic.settings.scaleForExport
 import java.io.File
 import java.io.OutputStream
 import kotlin.math.max
@@ -93,7 +97,9 @@ fun PreviewScreen(
     var processed by remember { mutableStateOf<Bitmap?>(null) }
     var compareOn by remember { mutableStateOf(false) }
     var adjustOn by remember { mutableStateOf(false) }
+    var settingsOn by remember { mutableStateOf(false) }
     var exporting by remember { mutableStateOf(false) }
+    val exportSettings = rememberExportSettings()
 
     LaunchedEffect(sourceUri) {
         preview = withContext(Dispatchers.IO) { sourceUri?.let { loadPreviewBitmap(context, it) } }
@@ -134,6 +140,9 @@ fun PreviewScreen(
                             tint = if (compareOn) MaterialTheme.colorScheme.secondary
                             else MaterialTheme.colorScheme.onBackground,
                         )
+                    }
+                    IconButton(onClick = { settingsOn = true }) {
+                        Icon(Icons.Default.Settings, contentDescription = "Export settings")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -229,7 +238,7 @@ fun PreviewScreen(
                             val uri = withContext(Dispatchers.IO) {
                                 val full = sourceUri?.let { loadFullBitmap(context, it) } ?: return@withContext null
                                 val styled = LutProcessor.apply(full, selectedStyle, context, adjustments)
-                                writeShareCache(context, styled, selectedStyle)
+                                writeShareCache(context, styled, selectedStyle, exportSettings.value)
                             }
                             exporting = false
                             if (uri != null) startShare(context, uri)
@@ -253,7 +262,7 @@ fun PreviewScreen(
                             val saved = withContext(Dispatchers.IO) {
                                 val full = sourceUri?.let { loadFullBitmap(context, it) } ?: return@withContext false
                                 val styled = LutProcessor.apply(full, selectedStyle, context, adjustments)
-                                saveToGallery(context, styled, selectedStyle)
+                                saveToGallery(context, styled, selectedStyle, exportSettings.value)
                             }
                             exporting = false
                             Toast.makeText(
@@ -276,6 +285,14 @@ fun PreviewScreen(
                 }
             }
         }
+    }
+
+    if (settingsOn) {
+        ExportSettingsDialog(
+            settings = exportSettings.value,
+            onChange = { exportSettings.value = it },
+            onDismiss = { settingsOn = false },
+        )
     }
 }
 
@@ -352,7 +369,7 @@ private fun applyExifOrientation(bitmap: Bitmap, orientation: Int): Bitmap {
     return rotated
 }
 
-private fun saveToGallery(context: Context, bitmap: Bitmap, style: Style): Boolean {
+private fun saveToGallery(context: Context, bitmap: Bitmap, style: Style, settings: ExportSettings): Boolean {
     val fileName = "Filmic_${style.id}_${System.currentTimeMillis()}.jpg"
     val values = ContentValues().apply {
         put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
@@ -363,24 +380,30 @@ private fun saveToGallery(context: Context, bitmap: Bitmap, style: Style): Boole
     }
     val resolver = context.contentResolver
     val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return false
+    val sized = bitmap.scaleForExport(settings.maxLongEdge)
     return try {
         resolver.openOutputStream(uri)?.use { out: OutputStream ->
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 94, out)
+            sized.compress(Bitmap.CompressFormat.JPEG, settings.jpegQuality, out)
         }
         true
     } catch (t: Throwable) {
         false
+    } finally {
+        if (sized !== bitmap) sized.recycle()
     }
 }
 
-private fun writeShareCache(context: Context, bitmap: Bitmap, style: Style): Uri? {
+private fun writeShareCache(context: Context, bitmap: Bitmap, style: Style, settings: ExportSettings): Uri? {
     val dir = File(context.cacheDir, "share").apply { mkdirs() }
     val file = File(dir, "Filmic_${style.id}_${System.currentTimeMillis()}.jpg")
+    val sized = bitmap.scaleForExport(settings.maxLongEdge)
     return try {
-        file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 94, it) }
+        file.outputStream().use { sized.compress(Bitmap.CompressFormat.JPEG, settings.jpegQuality, it) }
         FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
     } catch (t: Throwable) {
         null
+    } finally {
+        if (sized !== bitmap) sized.recycle()
     }
 }
 
