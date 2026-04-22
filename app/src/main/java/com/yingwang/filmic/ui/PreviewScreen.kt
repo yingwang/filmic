@@ -2,6 +2,7 @@ package com.yingwang.filmic.ui
 
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -25,6 +27,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -57,6 +61,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -150,16 +155,11 @@ fun PreviewScreen(
             )
         },
     ) { inner ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(inner),
-        ) {
+        val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+        val previewBox: @Composable (Modifier) -> Unit = { mod ->
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .padding(horizontal = 24.dp, vertical = 12.dp)
+                modifier = mod
                     .clip(RoundedCornerShape(2.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center,
@@ -181,15 +181,18 @@ fun PreviewScreen(
                     )
                 }
             }
+        }
 
+        val stylesPanel: @Composable (Modifier) -> Unit = { mod ->
             if (adjustOn) {
                 AdjustPanel(
                     adjustments = adjustments,
                     onChange = { adjustments = it },
                     onReset = { adjustments = Adjustments() },
+                    modifier = mod,
                 )
             } else {
-                Column(modifier = Modifier.padding(horizontal = 24.dp)) {
+                Column(modifier = mod.padding(horizontal = 24.dp)) {
                     Text(
                         text = "${selectedStyle.brand.display} · ${selectedStyle.localizedDescription()}",
                         style = MaterialTheme.typography.bodyMedium,
@@ -217,14 +220,12 @@ fun PreviewScreen(
                     }
                 }
             }
+        }
 
-            Spacer(Modifier.height(20.dp))
+        val actionRow: @Composable (Modifier) -> Unit = { mod ->
             Row(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .padding(bottom = 16.dp),
+                modifier = mod,
             ) {
                 OutlinedButton(
                     enabled = ready && !exporting,
@@ -288,6 +289,54 @@ fun PreviewScreen(
                 ) {
                     Text(stringResource(R.string.export).uppercase(), style = MaterialTheme.typography.labelLarge)
                 }
+            }
+        }
+
+        if (isLandscape) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(inner),
+            ) {
+                previewBox(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+                )
+                Column(
+                    modifier = Modifier
+                        .width(320.dp)
+                        .fillMaxHeight()
+                        .padding(end = 8.dp, top = 12.dp, bottom = 12.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    stylesPanel(Modifier.fillMaxWidth())
+                    Spacer(Modifier.height(16.dp))
+                    actionRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(inner),
+            ) {
+                previewBox(
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 24.dp, vertical = 12.dp),
+                )
+                stylesPanel(Modifier.fillMaxWidth())
+                Spacer(Modifier.height(20.dp))
+                actionRow(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
+                        .padding(bottom = 16.dp),
+                )
             }
         }
     }

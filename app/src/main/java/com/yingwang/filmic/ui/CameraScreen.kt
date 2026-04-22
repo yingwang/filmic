@@ -3,6 +3,7 @@ package com.yingwang.filmic.ui
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.os.Handler
@@ -31,12 +32,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -64,6 +67,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
@@ -198,16 +202,12 @@ fun CameraScreen(onBack: () -> Unit) {
             )
         },
     ) { inner ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(inner),
-        ) {
+        val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val mainHandler = remember { Handler(Looper.getMainLooper()) }
+
+        val previewBox: @Composable (Modifier) -> Unit = { mod ->
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                modifier = mod
                     .clip(RoundedCornerShape(2.dp))
                     .background(Color(0xFF111111)),
                 contentAlignment = Alignment.Center,
@@ -234,50 +234,105 @@ fun CameraScreen(onBack: () -> Unit) {
                     }
                 }
             }
+        }
 
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp),
-            ) {
-                items(Styles.all, key = { it.id }) { s ->
-                    DarkChip(
-                        style = s,
-                        selected = s.id == selectedStyle.id,
-                        onClick = { selectedStyle = s },
-                    )
-                }
-            }
+        val onShutter: () -> Unit = {
+            capturing = true
+            captureToGallery(
+                context = context,
+                imageCapture = imageCapture,
+                style = selectedStyle,
+                settings = settings.value,
+                onComplete = { ok ->
+                    mainHandler.post {
+                        capturing = false
+                        Toast.makeText(
+                            context,
+                            context.getString(
+                                if (ok) R.string.toast_saved else R.string.toast_capture_failed,
+                            ),
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                },
+            )
+        }
 
+        if (isLandscape) {
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 24.dp),
-                horizontalArrangement = Arrangement.Center,
+                    .fillMaxSize()
+                    .padding(inner),
             ) {
-                val mainHandler = remember { Handler(Looper.getMainLooper()) }
-                ShutterButton(enabled = hasPermission && !capturing) {
-                    capturing = true
-                    captureToGallery(
-                        context = context,
-                        imageCapture = imageCapture,
-                        style = selectedStyle,
-                        settings = settings.value,
-                        onComplete = { ok ->
-                            mainHandler.post {
-                                capturing = false
-                                Toast.makeText(
-                                    context,
-                                    context.getString(
-                                        if (ok) R.string.toast_saved else R.string.toast_capture_failed,
-                                    ),
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                            }
-                        },
-                    )
+                previewBox(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .padding(start = 12.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                )
+                Column(
+                    modifier = Modifier
+                        .width(160.dp)
+                        .fillMaxHeight()
+                        .padding(end = 12.dp, top = 8.dp, bottom = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    LazyColumn(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(vertical = 8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                    ) {
+                        items(Styles.all, key = { it.id }) { s ->
+                            DarkChip(
+                                style = s,
+                                selected = s.id == selectedStyle.id,
+                                onClick = { selectedStyle = s },
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    ShutterButton(enabled = hasPermission && !capturing, onClick = onShutter)
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(inner),
+            ) {
+                previewBox(
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                )
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                ) {
+                    items(Styles.all, key = { it.id }) { s ->
+                        DarkChip(
+                            style = s,
+                            selected = s.id == selectedStyle.id,
+                            onClick = { selectedStyle = s },
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 24.dp),
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    ShutterButton(enabled = hasPermission && !capturing, onClick = onShutter)
                 }
             }
         }
