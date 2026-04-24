@@ -1,5 +1,6 @@
 package com.yingwang.filmic.ui
 
+import android.content.res.Configuration
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -7,17 +8,23 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
@@ -32,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -69,28 +77,14 @@ fun StyleScreen(
             )
         },
     ) { inner ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(inner),
-        ) {
-            if (sourceUri != null) {
-                AsyncImage(
-                    model = sourceUri,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(3f / 2f)
-                        .padding(horizontal = 24.dp)
-                        .clip(RoundedCornerShape(2.dp)),
-                )
-            }
-            Spacer(Modifier.height(20.dp))
-            val grouped = Styles.all.groupBy { it.brand }
+        val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val grouped = Styles.all.groupBy { it.brand }
+
+        val styleList: @Composable (Modifier) -> Unit = { mod ->
             LazyColumn(
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(18.dp),
+                modifier = mod,
             ) {
                 grouped.forEach { (brand, styles) ->
                     item(key = "header_${brand.name}") {
@@ -105,6 +99,56 @@ fun StyleScreen(
                         StyleRow(style = style, onClick = { onPick(style.id) })
                     }
                 }
+            }
+        }
+
+        if (isLandscape) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(inner),
+            ) {
+                if (sourceUri != null) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        AsyncImage(
+                            model = sourceUri,
+                            contentDescription = null,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+                styleList(
+                    Modifier
+                        .width(280.dp)
+                        .fillMaxHeight(),
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(inner),
+            ) {
+                if (sourceUri != null) {
+                    AsyncImage(
+                        model = sourceUri,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(3f / 2f)
+                            .padding(horizontal = 24.dp)
+                            .clip(RoundedCornerShape(2.dp)),
+                    )
+                }
+                Spacer(Modifier.height(20.dp))
+                styleList(Modifier.fillMaxWidth())
             }
         }
     }

@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
@@ -302,18 +303,24 @@ fun PreviewScreen(
                     Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+                        .padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
                 )
                 Column(
                     modifier = Modifier
-                        .width(320.dp)
+                        .width(280.dp)
                         .fillMaxHeight()
-                        .padding(end = 8.dp, top = 12.dp, bottom = 12.dp)
-                        .verticalScroll(rememberScrollState()),
+                        .padding(end = 8.dp, top = 8.dp, bottom = 8.dp),
                 ) {
-                    stylesPanel(Modifier.fillMaxWidth())
-                    Spacer(Modifier.height(16.dp))
-                    actionRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                    ) {
+                        stylesPanel(Modifier.fillMaxWidth())
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    actionRow(Modifier.fillMaxWidth().padding(horizontal = 8.dp))
                     Spacer(Modifier.height(8.dp))
                 }
             }

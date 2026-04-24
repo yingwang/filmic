@@ -1,6 +1,7 @@
 package com.yingwang.filmic.ui
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.Configuration
@@ -8,6 +9,7 @@ import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.os.Handler
 import android.os.Looper
+import android.view.Surface
 import android.util.Size
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -118,25 +120,8 @@ fun CameraScreen(onBack: () -> Unit) {
     var capturing by remember { mutableStateOf(false) }
     val imageCapture = remember { ImageCapture.Builder().build() }
     val previewUseCase = remember { Preview.Builder().build() }
-    val analyzerExecutor = remember { Executors.newSingleThreadExecutor() }
-    val previewView = remember {
-        PreviewView(context).apply {
-            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-            scaleType = PreviewView.ScaleType.FIT_CENTER
-        }
-    }
-
-    DisposableEffect(Unit) {
-        previewUseCase.setSurfaceProvider(previewView.surfaceProvider)
-        onDispose { analyzerExecutor.shutdown() }
-    }
-
-    LaunchedEffect(hasPermission) {
-        if (!hasPermission) return@LaunchedEffect
-        val provider = ProcessCameraProvider.getInstance(context).awaitInstance()
-        provider.unbindAll()
-
-        val analysis = ImageAnalysis.Builder()
+    val imageAnalysis = remember {
+        ImageAnalysis.Builder()
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .setResolutionSelector(
                 ResolutionSelector.Builder()
@@ -149,8 +134,34 @@ fun CameraScreen(onBack: () -> Unit) {
                     .build(),
             )
             .build()
+    }
+    val analyzerExecutor = remember { Executors.newSingleThreadExecutor() }
+    val previewView = remember {
+        PreviewView(context).apply {
+            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+            scaleType = PreviewView.ScaleType.FILL_CENTER
+        }
+    }
 
-        analysis.setAnalyzer(analyzerExecutor) { image ->
+    DisposableEffect(Unit) {
+        previewUseCase.setSurfaceProvider(previewView.surfaceProvider)
+        onDispose { analyzerExecutor.shutdown() }
+    }
+
+    // Update target rotation when device orientation changes
+    val orientation = LocalConfiguration.current.orientation
+    LaunchedEffect(orientation) {
+        val rotation = (context as? Activity)?.display?.rotation ?: Surface.ROTATION_0
+        imageCapture.targetRotation = rotation
+        imageAnalysis.targetRotation = rotation
+    }
+
+    LaunchedEffect(hasPermission) {
+        if (!hasPermission) return@LaunchedEffect
+        val provider = ProcessCameraProvider.getInstance(context).awaitInstance()
+        provider.unbindAll()
+
+        imageAnalysis.setAnalyzer(analyzerExecutor) { image ->
             val bmp = image.toRotatedBitmap()
             image.close()
             if (bmp == null) return@setAnalyzer
@@ -168,7 +179,7 @@ fun CameraScreen(onBack: () -> Unit) {
                 lifecycle,
                 CameraSelector.DEFAULT_BACK_CAMERA,
                 previewUseCase,
-                analysis,
+                imageAnalysis,
                 imageCapture,
             )
         } catch (t: Throwable) {
@@ -228,7 +239,7 @@ fun CameraScreen(onBack: () -> Unit) {
                         Image(
                             bitmap = f.asImageBitmap(),
                             contentDescription = null,
-                            contentScale = ContentScale.Fit,
+                            contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
