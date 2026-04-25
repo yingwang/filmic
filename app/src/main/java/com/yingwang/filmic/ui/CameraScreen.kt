@@ -3,9 +3,11 @@ package com.yingwang.filmic.ui
 import android.Manifest
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Bitmap
+import android.net.Uri
 import android.graphics.Matrix
 import android.os.Handler
 import android.os.Looper
@@ -76,6 +78,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import coil.compose.AsyncImage
 import com.yingwang.filmic.R
 import com.yingwang.filmic.io.MediaSaver
 import com.yingwang.filmic.lut.LutProcessor
@@ -118,6 +121,7 @@ fun CameraScreen(onBack: () -> Unit) {
     var selectedStyle by remember { mutableStateOf(Styles.all.first()) }
     var overlayFrame by remember { mutableStateOf<Bitmap?>(null) }
     var capturing by remember { mutableStateOf(false) }
+    var latestPhotoUri by remember { mutableStateOf<Uri?>(null) }
     val imageCapture = remember { ImageCapture.Builder().build() }
     val previewUseCase = remember { Preview.Builder().build() }
     val imageAnalysis = remember {
@@ -146,6 +150,10 @@ fun CameraScreen(onBack: () -> Unit) {
     DisposableEffect(Unit) {
         previewUseCase.setSurfaceProvider(previewView.surfaceProvider)
         onDispose { analyzerExecutor.shutdown() }
+    }
+
+    LaunchedEffect(Unit) {
+        latestPhotoUri = withContext(Dispatchers.IO) { MediaSaver.latestPhoto(context) }
     }
 
     // Update target rotation when device orientation changes
@@ -257,6 +265,7 @@ fun CameraScreen(onBack: () -> Unit) {
                 onComplete = { ok ->
                     mainHandler.post {
                         capturing = false
+                        if (ok) latestPhotoUri = MediaSaver.latestPhoto(context)
                         Toast.makeText(
                             context,
                             context.getString(
@@ -305,6 +314,13 @@ fun CameraScreen(onBack: () -> Unit) {
                     }
                     Spacer(Modifier.height(12.dp))
                     ShutterButton(enabled = hasPermission && !capturing, onClick = onShutter)
+                    latestPhotoUri?.let { uri ->
+                        Spacer(Modifier.height(12.dp))
+                        GalleryThumbnail(
+                            uri = uri,
+                            onClick = { openGallery(context, uri) },
+                        )
+                    }
                     Spacer(Modifier.height(8.dp))
                 }
             }
@@ -337,13 +353,22 @@ fun CameraScreen(onBack: () -> Unit) {
                     }
                 }
 
-                Row(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 24.dp),
-                    horizontalArrangement = Arrangement.Center,
+                    contentAlignment = Alignment.Center,
                 ) {
                     ShutterButton(enabled = hasPermission && !capturing, onClick = onShutter)
+                    latestPhotoUri?.let { uri ->
+                        GalleryThumbnail(
+                            uri = uri,
+                            onClick = { openGallery(context, uri) },
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .padding(start = 32.dp),
+                        )
+                    }
                 }
             }
         }
@@ -382,6 +407,28 @@ private fun ShutterButton(enabled: Boolean, onClick: () -> Unit) {
         Box(modifier = Modifier.size(60.dp).clip(CircleShape).background(Color.Black))
         Box(modifier = Modifier.size(54.dp).clip(CircleShape).background(Color.White))
     }
+}
+
+@Composable
+private fun GalleryThumbnail(uri: Uri, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    AsyncImage(
+        model = uri,
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = modifier
+            .size(48.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .border(1.5.dp, Color(0xFF555555), RoundedCornerShape(6.dp))
+            .clickable(onClick = onClick),
+    )
+}
+
+private fun openGallery(context: Context, uri: Uri) {
+    try {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW).apply { setDataAndType(uri, "image/jpeg") },
+        )
+    } catch (_: Throwable) { }
 }
 
 /**

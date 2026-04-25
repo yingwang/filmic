@@ -1,5 +1,6 @@
 package com.yingwang.filmic.io
 
+import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
@@ -104,6 +105,33 @@ object MediaSaver {
             try { context.contentResolver.delete(uri, null, null) } catch (_: Throwable) {}
             false
         }
+    }
+
+    /** Returns the content URI of the most recent image saved under DCIM/Filmic, or null. */
+    fun latestPhoto(context: Context): Uri? {
+        val projection = arrayOf(MediaStore.Images.Media._ID)
+        val selection: String?
+        val selectionArgs: Array<String>?
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            selection = "${MediaStore.Images.Media.RELATIVE_PATH} LIKE ?"
+            selectionArgs = arrayOf("$RELATIVE_PATH%")
+        } else {
+            selection = "${MediaStore.Images.Media.DISPLAY_NAME} LIKE ?"
+            selectionArgs = arrayOf("Filmic_%")
+        }
+        context.contentResolver.query(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            projection,
+            selection,
+            selectionArgs,
+            "${MediaStore.Images.Media.DATE_ADDED} DESC",
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID))
+                return ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
+            }
+        }
+        return null
     }
 
     private fun writeNormalOrientation(context: Context, uri: Uri) {
